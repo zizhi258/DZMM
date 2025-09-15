@@ -278,6 +278,8 @@
       text: '',
     }
     messages.value.push(assistant)
+    // 从响应式数组中获取对 assistant 消息的实际引用，以确保更新能够被侦测到
+    const reactiveAssistant = messages.value[messages.value.length - 1]
     scrollToBottom()
 
     isStreaming.value = true
@@ -291,7 +293,7 @@
         {
           onText: chunk => {
             // 实时流式渲染
-            assistant.text += chunk
+            reactiveAssistant.text += chunk
             scrollToBottom()
           },
           onFinished: () => {

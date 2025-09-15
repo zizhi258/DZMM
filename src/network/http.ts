@@ -440,8 +440,6 @@ class HttpClient {
           const { done, value } = await reader!.read()
           if (done) break
           buffer += textDecoder.decode(value, { stream: true })
-          // 兼容 CRLF：统一为 \n 再按 \n\n 切分
-          buffer = buffer.replace(/\r\n/g, '\n')
           let idx
           // 按照 \n\n 分包（eventsource 事件边界）
           while ((idx = buffer.indexOf('\n\n')) !== -1) {
@@ -456,6 +454,7 @@ class HttpClient {
                 controller.abort()
                 return
               }
+              // console.log('SSE event data:', data) // 调试日志
               onEvent(data)
             })
           }
