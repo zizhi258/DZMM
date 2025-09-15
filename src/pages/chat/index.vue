@@ -24,8 +24,45 @@
 
     <section class="chat">
       <el-scrollbar ref="scrollRef" class="messages">
-        <div class="message" v-for="m in messages" :key="m.id" :class="m.role">
-          <div class="bubble">{{ m.text }}</div>
+        <div
+          class="message"
+          v-for="m in messages"
+          :key="m.id"
+          :class="m.role"
+          @mouseenter="hoveredMessageId = m.id"
+          @mouseleave="hoveredMessageId = null"
+        >
+          <img
+            :src="
+              m.role === 'user'
+                ? '/assets/user-avatar.svg'
+                : '/assets/ai-avatar.svg'
+            "
+            class="avatar"
+          />
+          <div class="message-content">
+            <div v-if="editingMessageId === m.id" class="edit-mode">
+              <el-input type="textarea" v-model="editText" :rows="4" />
+              <div class="edit-actions">
+                <el-button size="small" type="primary" @click="saveEdit"
+                  >保存</el-button
+                >
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </div>
+            </div>
+            <div v-else class="bubble-wrap">
+              <div class="actions" v-if="hoveredMessageId === m.id">
+                <el-icon @click="startEdit(m)"><Edit /></el-icon>
+                <el-icon @click="deleteMessage(m.id)"><Delete /></el-icon>
+              </div>
+              <div
+                class="bubble"
+                v-if="m.role === 'assistant'"
+                v-html="marked(m.text)"
+              ></div>
+              <div class="bubble" v-else>{{ m.text }}</div>
+            </div>
+          </div>
         </div>
       </el-scrollbar>
       <div class="composer">
@@ -95,7 +132,9 @@
               <el-switch v-model="settings.readAsteriskOnly" />
             </el-form-item>
             <el-divider />
-            <el-button type="danger" plain>删除此会话</el-button>
+            <el-button type="danger" plain @click="deleteCurrentConversation"
+              >删除此会话</el-button
+            >
           </el-form>
         </div>
       </el-scrollbar>
@@ -105,7 +144,9 @@
 
 <script setup lang="ts">
   import { ref, reactive, computed, nextTick, watch } from 'vue'
-  import { ElMessage, ElScrollbar } from 'element-plus'
+  import { ElMessage, ElScrollbar, ElMessageBox } from 'element-plus'
+  import { Edit, Delete } from '@element-plus/icons-vue'
+  import { marked } from 'marked'
   import {
     streamChatCompletion,
     buildHistory,
@@ -145,6 +186,9 @@
   }
   function saveMessages(convId: number, msgs: Message[]) {
     localStorage.setItem(LS_MSG_PREFIX + convId, JSON.stringify(msgs))
+  }
+  function removeMessages(convId: number) {
+    localStorage.removeItem(LS_MSG_PREFIX + convId)
   }
 
   // 消息列表滚动容器
@@ -199,6 +243,9 @@
   const isStreaming = ref(false)
   let stopCurrent: (() => void) | null = null
   const model = ref(getDefaultModel())
+  const hoveredMessageId = ref<number | null>(null)
+  const editingMessageId = ref<number | null>(null)
+  const editText = ref('')
 
   function selectConv(id: number) {
     selectedId.value = id
@@ -330,6 +377,72 @@
     }
   }
 
+  function deleteMessage(id: number) {
+    const index = messages.value.findIndex(m => m.id === id)
+    if (index !== -1) {
+      messages.value.splice(index, 1)
+    }
+  }
+
+  function startEdit(message: Message) {
+    editingMessageId.value = message.id
+    editText.value = message.text
+  }
+
+  function saveEdit() {
+    if (editingMessageId.value === null) return
+    const message = messages.value.find(m => m.id === editingMessageId.value)
+    if (message) {
+      message.text = editText.value
+    }
+    cancelEdit()
+  }
+
+  function cancelEdit() {
+    editingMessageId.value = null
+    editText.value = ''
+  }
+
+  async function deleteCurrentConversation() {
+    try {
+      await ElMessageBox.confirm(
+        '确定要删除当前会话吗？此操作将无法撤销。',
+        '警告',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        },
+      )
+
+      const idToDelete = selectedId.value
+      const index = conversations.value.findIndex(c => c.id === idToDelete)
+
+      if (index !== -1) {
+        // 从数组中移除
+        conversations.value.splice(index, 1)
+        // 从 localStorage 移除消息
+        removeMessages(idToDelete)
+        // 更新会话列表存储
+        saveConversations(conversations.value)
+
+        // 切换到新会话
+        if (conversations.value.length > 0) {
+          // 优先切换到前一个，否则后一个
+          const newIndex = Math.max(0, index - 1)
+          selectedId.value = conversations.value[newIndex].id
+        } else {
+          // 如果没有会话了，则新建一个
+          newConversation()
+        }
+        ElMessage.success('会话已删除')
+      }
+    } catch {
+      // 用户点击了取消
+      ElMessage.info('操作已取消')
+    }
+  }
+
   const settings = reactive({
     highlight: false,
     title:
@@ -439,13 +552,78 @@
   }
   .message {
     display: flex;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 20px;
   }
+
   .message.user {
+    flex-direction: row-reverse;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #f0f2f5;
+  }
+
+  .message-content {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+  }
+
+  .bubble-wrap {
+    position: relative;
+  }
+
+  .actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #fff;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 4px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .message.user .actions {
+    left: -40px;
+  }
+
+  .message.assistant .actions {
+    right: -40px;
+  }
+
+  .bubble-wrap:hover .actions {
+    opacity: 1;
+  }
+
+  .actions .el-icon {
+    cursor: pointer;
+    color: #606266;
+  }
+  .actions .el-icon:hover {
+    color: #409eff;
+  }
+
+  .edit-mode {
+    width: 100%;
+  }
+
+  .edit-actions {
+    display: flex;
     justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
   }
   .bubble {
-    max-width: 70%;
     padding: 10px 12px;
     border-radius: 8px;
     background: #fff;
@@ -453,10 +631,11 @@
     white-space: pre-wrap;
     word-break: break-word;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e0e0e0;
   }
   .message.user .bubble {
-    background: #409eff;
-    color: #fff;
+    background: #ecf5ff;
+    border-color: #d9ecff;
   }
 
   .composer {
@@ -483,5 +662,41 @@
   }
   .settings-panel {
     padding-right: 8px;
+  }
+  .bubble :deep(h1),
+  .bubble :deep(h2),
+  .bubble :deep(h3) {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+  }
+
+  .bubble :deep(p) {
+    margin-bottom: 1em;
+  }
+
+  .bubble :deep(ul),
+  .bubble :deep(ol) {
+    padding-left: 2em;
+    margin-bottom: 1em;
+  }
+
+  .bubble :deep(pre) {
+    background-color: #f4f4f4;
+    padding: 1em;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .bubble :deep(code) {
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    background-color: #f4f4f4;
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+  }
+
+  .bubble :deep(pre) > code {
+    background-color: transparent;
+    padding: 0;
   }
 </style>
