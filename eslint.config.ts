@@ -1,14 +1,11 @@
 import { globalIgnores } from 'eslint/config'
-import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from '@vue/eslint-config-typescript'
 import pluginVue from 'eslint-plugin-vue'
-import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
-import prettier from 'eslint-plugin-prettier'
+// import skipFormatting from '@vue/eslint-config-prettier/skip-formatting' // <-- 移除这一行
 import prettierConfig from 'eslint-config-prettier'
-
-// To allow more languages other than `ts` in `.vue` files, uncomment the following lines:
-// import { configureVueProject } from '@vue/eslint-config-typescript'
-// configureVueProject({ scriptLangs: ['ts', 'tsx'] })
-// More info at https://github.com/vuejs/eslint-config-typescript/#advanced-setup
 
 export default defineConfigWithVueTs(
   {
@@ -20,16 +17,8 @@ export default defineConfigWithVueTs(
 
   pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
-  skipFormatting,
+  // skipFormatting, // <-- 移除这一项
 
   // 添加 Prettier 配置
-  prettierConfig,
-  {
-    plugins: {
-      prettier,
-    },
-    rules: {
-      'prettier/prettier': 'error',
-    },
-  },
+  prettierConfig, // 确保这个在最后，用来关闭冲突的 ESLint 规则
 )
