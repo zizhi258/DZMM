@@ -277,14 +277,12 @@
   async function fetchModels() {
     try {
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+      const baseUrl = import.meta.env.VITE_OPENAI_BASE_URL
       const headers: Record<string, string> = {}
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`
       }
-      const response = await fetch(
-        'https://jimiround-latest.onrender.com/v1/models',
-        { headers },
-      )
+      const response = await fetch(`${baseUrl}/v1/models`, { headers })
       if (!response.ok) {
         throw new Error('Network response was not ok')
       }
