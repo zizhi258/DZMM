@@ -2,10 +2,11 @@
   <div class="chat-page">
     <section class="sidebar">
       <div class="sidebar-head">
-        <el-input v-model="q" placeholder="搜索会话" clearable />
-        <el-button type="primary" size="small" @click="newConversation"
-          >新建会话</el-button
-        >
+        <el-input v-model="q" placeholder="搜索会话" clearable>
+          <template #append>
+            <el-button :icon="Plus" @click="newConversation" />
+          </template>
+        </el-input>
       </div>
       <el-scrollbar class="sidebar-list">
         <ul class="conv-list">
@@ -23,6 +24,16 @@
     </section>
 
     <section class="chat">
+      <div class="chat-header">
+        <el-select v-model="model" placeholder="选择模型" style="width: 240px">
+          <el-option
+            v-for="item in models"
+            :key="item.id"
+            :label="item.name"
+            :value="item.id"
+          />
+        </el-select>
+      </div>
       <el-scrollbar ref="scrollRef" class="messages">
         <div
           class="message"
@@ -75,12 +86,21 @@
           @keydown.enter.prevent="onEnter"
         />
         <div class="composer-actions">
-          <el-button :disabled="isStreaming" type="primary" @click="send"
-            >发送</el-button
-          >
-          <el-button v-if="isStreaming" type="warning" plain @click="stop"
-            >停止</el-button
-          >
+          <el-button
+            :disabled="isStreaming"
+            type="primary"
+            circle
+            @click="send"
+            :icon="Promotion"
+          />
+          <el-button
+            v-if="isStreaming"
+            type="warning"
+            plain
+            @click="stop"
+            circle
+            :icon="VideoPause"
+          />
         </div>
       </div>
     </section>
@@ -88,7 +108,7 @@
     <section class="settings">
       <el-scrollbar class="settings-scroll">
         <div class="settings-panel">
-          <el-form label-width="100px" :model="settings">
+          <el-form label-position="top" :model="settings">
             <el-form-item label="开启高亮">
               <el-switch v-model="settings.highlight" />
             </el-form-item>
@@ -143,9 +163,15 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, computed, nextTick, watch } from 'vue'
+  import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
   import { ElMessage, ElScrollbar, ElMessageBox } from 'element-plus'
-  import { Edit, Delete } from '@element-plus/icons-vue'
+  import {
+    Edit,
+    Delete,
+    Plus,
+    Promotion,
+    VideoPause,
+  } from '@element-plus/icons-vue'
   import { marked } from 'marked'
   import {
     streamChatCompletion,
@@ -246,6 +272,36 @@
   const hoveredMessageId = ref<number | null>(null)
   const editingMessageId = ref<number | null>(null)
   const editText = ref('')
+  const models = ref<{ id: string; name: string }[]>([])
+
+  async function fetchModels() {
+    try {
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+      const headers: Record<string, string> = {}
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      }
+      const response = await fetch(
+        'https://jimiround-latest.onrender.com/v1/models',
+        { headers },
+      )
+      if (!response.ok) {
+        throw new Error('Network response was not ok')
+      }
+      const data = await response.json()
+      models.value = data.data.map((m: { id: string }) => ({
+        id: m.id,
+        name: m.id,
+      }))
+    } catch (error) {
+      console.error('Failed to fetch models:', error)
+      ElMessage.error('获取模型列表失败')
+    }
+  }
+
+  onMounted(() => {
+    fetchModels()
+  })
 
   function selectConv(id: number) {
     selectedId.value = id
@@ -306,8 +362,7 @@
 
   async function send() {
     if (isStreaming.value) return
-    const text = draft.value.trim()
-    if (!text) return
+    const text = draft.value.trim() || ''
 
     // 在推入 assistant 占位前构建历史（仅包含已存在消息 + 本次 user）
     const history = toOAIHistory({ role: 'user', text })
@@ -485,20 +540,37 @@
   .chat-page {
     height: 100%;
     display: grid;
-    grid-template-columns: 260px 1fr 320px;
-    background: #fff;
+    grid-template-columns: 280px 1fr 280px;
+    background-color: #fff;
+    color: #333;
   }
+
+  /* Sidebar */
   .sidebar {
-    border-right: 1px solid #ebeef5;
+    background-color: #fff;
     display: flex;
     flex-direction: column;
+    padding: 8px;
   }
   .sidebar-head {
-    padding: 12px;
-    border-bottom: 1px solid #ebeef5;
+    padding: 12px 8px;
     display: flex;
     gap: 8px;
     align-items: center;
+  }
+  .sidebar-head :deep(.el-input__wrapper) {
+    border-radius: 8px;
+    background-color: #f7f7f8;
+    box-shadow: none;
+  }
+  .sidebar-head :deep(.el-button) {
+    border-radius: 8px;
+  }
+  .sidebar-head :deep(.el-input-group__append) {
+    background-color: transparent;
+    box-shadow: none;
+    border: none;
+    padding: 0 0 0 8px;
   }
   .sidebar-list {
     flex: 1;
@@ -511,35 +583,54 @@
   .conv-item {
     padding: 12px 12px;
     cursor: pointer;
-    border-bottom: 1px solid #f2f3f5;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: background-color 0.2s;
   }
   .conv-item:hover {
-    background: #f5f7fa;
+    background: #f5f5f5;
   }
   .conv-item.active {
-    background: #ecf5ff;
+    background-color: #efe7fb;
+    color: #6a2c9d;
+  }
+  .conv-item.active .title {
+    color: #6a2c9d;
+  }
+  .conv-item.active .subtitle {
+    color: #8b5fbf;
   }
   .conv-item .title {
     font-weight: 500;
     color: #303133;
+    font-size: 14px;
   }
   .conv-item .subtitle {
     font-size: 12px;
     color: #909399;
     margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
+  /* Chat Area */
   .chat {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 0; /* 允许子项 .messages 在 flex 容器中正确收缩产生内部滚动 */
-    background: #f5f7fa;
+    min-height: 0;
+  }
+  .chat-header {
+    padding: 12px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
   }
   .messages {
     flex: 1;
-    padding: 16px;
-    min-height: 0; /* 关键：允许内容区域在列布局中可滚动 */
+    padding: 24px;
+    min-height: 0;
     height: 0;
   }
   .messages :deep(.el-scrollbar__wrap) {
@@ -549,74 +640,67 @@
   .messages :deep(.el-scrollbar__view) {
     display: flex;
     flex-direction: column;
+    gap: 28px;
   }
   .message {
     display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 16px;
   }
-
   .message.user {
     flex-direction: row-reverse;
   }
-
   .avatar {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     flex-shrink: 0;
     background: #f0f2f5;
+    border: 1px solid rgba(0, 0, 0, 0.05);
   }
-
   .message-content {
     display: flex;
     flex-direction: column;
-    max-width: 80%;
+    max-width: 85%;
   }
-
   .bubble-wrap {
     position: relative;
   }
-
   .actions {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
     background: #fff;
-    border-radius: 5px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 4px;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    padding: 6px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     z-index: 10;
     opacity: 0;
     transition: opacity 0.2s;
+    pointer-events: none;
   }
-
   .message.user .actions {
-    left: -40px;
+    left: -48px;
   }
-
   .message.assistant .actions {
-    right: -40px;
+    right: -48px;
   }
-
   .bubble-wrap:hover .actions {
     opacity: 1;
+    pointer-events: auto;
   }
-
   .actions .el-icon {
     cursor: pointer;
     color: #606266;
+    font-size: 16px;
   }
   .actions .el-icon:hover {
-    color: #409eff;
+    color: #6a2c9d;
   }
-
   .edit-mode {
     width: 100%;
   }
-
   .edit-actions {
     display: flex;
     justify-content: flex-end;
@@ -624,77 +708,101 @@
     margin-top: 8px;
   }
   .bubble {
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 12px 16px;
+    border-radius: 12px;
     background: #fff;
     color: #303133;
     white-space: pre-wrap;
     word-break: break-word;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    border: 1px solid #e0e0e0;
+    line-height: 1.6;
+    border: 1px solid #e5e5e5;
   }
   .message.user .bubble {
-    background: #ecf5ff;
-    border-color: #d9ecff;
+    background: #f9f5fe;
+    border-color: #e9d8ff;
   }
 
+  /* Composer */
   .composer {
-    border-top: 1px solid #e4e7ed;
     background: #fff;
-    padding: 12px;
-    /* 确保输入区固定高度，不被挤压 */
-    flex-shrink: 0;
+    padding: 12px 24px;
+    border-top: 1px solid #f0f0f0;
+    position: relative;
+  }
+  .composer :deep(.el-textarea__inner) {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    padding: 12px 56px 12px 12px; /* 为按钮留出空间 */
   }
   .composer-actions {
+    position: absolute;
+    right: 40px;
+    bottom: 30px;
     display: flex;
-    justify-content: flex-end;
-    margin-top: 8px;
+    gap: 8px;
   }
 
+  /* Settings */
   .settings {
-    border-left: 1px solid #ebeef5;
     background: #fff;
     height: 100%;
   }
   .settings-scroll {
     height: 100%;
-    padding: 16px;
+    padding: 24px;
   }
   .settings-panel {
     padding-right: 8px;
   }
+  .settings-panel :deep(.el-form-item__label) {
+    font-weight: 500;
+    color: #555;
+    padding-bottom: 2px;
+  }
+  .settings-panel :deep(.el-form-item) {
+    margin-bottom: 22px;
+  }
+  .settings-panel :deep(.el-select),
+  .settings-panel :deep(.el-input-number) {
+    width: 100%;
+  }
+  .settings-panel :deep(.el-divider) {
+    margin: 24px 0;
+  }
+  .settings-panel :deep(.el-button--danger) {
+    width: 100%;
+  }
+
+  /* Markdown Content */
   .bubble :deep(h1),
   .bubble :deep(h2),
   .bubble :deep(h3) {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    font-weight: 600;
   }
-
   .bubble :deep(p) {
     margin-bottom: 1em;
   }
-
   .bubble :deep(ul),
   .bubble :deep(ol) {
-    padding-left: 2em;
+    padding-left: 1.5em;
     margin-bottom: 1em;
   }
-
   .bubble :deep(pre) {
-    background-color: #f4f4f4;
+    background-color: #f5f5f5;
     padding: 1em;
-    border-radius: 6px;
+    border-radius: 8px;
     white-space: pre-wrap;
     word-break: break-all;
   }
-
   .bubble :deep(code) {
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-    background-color: #f4f4f4;
+    background-color: #f5f5f5;
     padding: 0.2em 0.4em;
-    border-radius: 3px;
+    border-radius: 4px;
+    font-size: 90%;
   }
-
   .bubble :deep(pre) > code {
     background-color: transparent;
     padding: 0;
