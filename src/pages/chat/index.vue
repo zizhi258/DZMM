@@ -1,6 +1,6 @@
 <template>
   <div class="chat-page">
-    <section class="sidebar">
+    <section :class="['sidebar', { 'is-open': isLeftSidebarOpen }]">
       <div class="sidebar-head">
         <el-input v-model="q" placeholder="搜索会话" clearable>
           <template #append>
@@ -25,6 +25,12 @@
 
     <section class="chat">
       <div class="chat-header">
+        <el-button
+          :icon="Menu"
+          class="sidebar-toggle-btn left"
+          @click="isLeftSidebarOpen = !isLeftSidebarOpen"
+          circle
+        />
         <el-select v-model="model" placeholder="选择模型" style="width: 240px">
           <el-option
             v-for="item in models"
@@ -33,6 +39,12 @@
             :value="item.id"
           />
         </el-select>
+        <el-button
+          :icon="Setting"
+          class="sidebar-toggle-btn right"
+          @click="isRightSidebarOpen = !isRightSidebarOpen"
+          circle
+        />
       </div>
       <el-scrollbar ref="scrollRef" class="messages">
         <div
@@ -105,7 +117,7 @@
       </div>
     </section>
 
-    <section class="settings">
+    <section :class="['settings', { 'is-open': isRightSidebarOpen }]">
       <el-scrollbar class="settings-scroll">
         <div class="settings-panel">
           <el-form label-position="top" :model="settings">
@@ -160,6 +172,11 @@
       </el-scrollbar>
     </section>
   </div>
+  <div
+    v-if="isLeftSidebarOpen || isRightSidebarOpen"
+    class="overlay"
+    @click="closeSidebars"
+  ></div>
 </template>
 
 <script setup lang="ts">
@@ -171,6 +188,8 @@
     Plus,
     Promotion,
     VideoPause,
+    Menu,
+    Setting,
   } from '@element-plus/icons-vue'
   import { marked } from 'marked'
   import {
@@ -229,6 +248,14 @@
   }
 
   defineOptions({ name: 'ChatIndexPage' })
+
+  const isLeftSidebarOpen = ref(false)
+  const isRightSidebarOpen = ref(false)
+
+  function closeSidebars() {
+    isLeftSidebarOpen.value = false
+    isRightSidebarOpen.value = false
+  }
 
   const conversations = ref<Conversation[]>(loadConversations())
   if (conversations.value.length === 0) {
@@ -541,6 +568,7 @@
     grid-template-columns: 280px 1fr 280px;
     background-color: #fff;
     color: #333;
+    overflow-x: hidden;
   }
 
   /* Sidebar */
@@ -624,6 +652,12 @@
     border-bottom: 1px solid #f0f0f0;
     display: flex;
     align-items: center;
+    justify-content: space-between;
+  }
+  .sidebar-toggle-btn {
+    display: none;
+    position: relative;
+    z-index: 1;
   }
   .messages {
     flex: 1;
@@ -804,5 +838,62 @@
   .bubble :deep(pre) > code {
     background-color: transparent;
     padding: 0;
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+  }
+
+  @media (max-width: 1024px) {
+    .chat-page {
+      grid-template-columns: 240px 1fr 240px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .chat-page {
+      grid-template-columns: 1fr;
+    }
+    .sidebar,
+    .settings {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 280px;
+      z-index: 100;
+      transition: transform 0.3s ease-in-out;
+      background-color: #fff;
+      border-right: 1px solid #e0e0e0;
+    }
+    .sidebar {
+      left: 0;
+      transform: translateX(-100%);
+    }
+    .settings {
+      right: 0;
+      transform: translateX(100%);
+      border-right: none;
+      border-left: 1px solid #e0e0e0;
+    }
+    .sidebar.is-open,
+    .settings.is-open {
+      transform: translateX(0);
+    }
+    .sidebar-toggle-btn {
+      display: inline-flex;
+    }
+    .chat-header {
+      justify-content: space-between;
+    }
+    .chat-header .el-select {
+      flex-grow: 1;
+      margin: 0 12px;
+    }
   }
 </style>
