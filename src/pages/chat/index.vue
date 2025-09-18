@@ -564,6 +564,7 @@
 <style scoped>
   .chat-page {
     height: 100%;
+    overflow: hidden;
     display: grid;
     grid-template-columns: 280px 1fr 280px;
     background-color: #fff;
