@@ -78,11 +78,17 @@
                 <el-icon @click="startEdit(m)"><Edit /></el-icon>
                 <el-icon @click="deleteMessage(m.id)"><Delete /></el-icon>
               </div>
-              <div
-                class="bubble"
-                v-if="m.role === 'assistant'"
-                v-html="marked(m.text)"
-              ></div>
+              <div class="bubble markdown-body" v-if="m.role === 'assistant'">
+                <div
+                  v-if="isStreaming && m.text.length === 0"
+                  class="typing-indicator"
+                >
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div v-else v-html="marked(m.text)"></div>
+              </div>
               <div class="bubble" v-else>{{ m.text }}</div>
             </div>
           </div>
@@ -192,6 +198,7 @@
     Setting,
   } from '@element-plus/icons-vue'
   import { marked } from 'marked'
+
   import {
     streamChatCompletion,
     buildHistory,
@@ -561,6 +568,10 @@
   ]
 </script>
 
+<style>
+  @import 'github-markdown-css/github-markdown.css';
+</style>
+
 <style scoped>
   .chat-page {
     height: 100%;
@@ -896,5 +907,41 @@
       flex-grow: 1;
       margin: 0 12px;
     }
+  }
+
+  /* Typing Indicator */
+  .typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+  }
+  .typing-indicator span {
+    height: 8px;
+    width: 8px;
+    border-radius: 50%;
+    background-color: #909399;
+    margin: 0 3px;
+    animation: blink 1.4s infinite both;
+  }
+  .typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes blink {
+    0% {
+      opacity: 0.2;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.2;
+    }
+  }
+
+  .markdown-body :deep(p) {
+    margin: 0;
   }
 </style>
